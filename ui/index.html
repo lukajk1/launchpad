@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launchpad</title>
+<link rel="icon" href="/icon.png">
+<style>
+  :root {
+    --bg: #eceef1; --surface: #ffffff; --raised: #f6f7f9; --line: #dde0e5; --line-strong: #c8ccd3;
+    --ink: #15181d; --muted: #5f6672; --faint: #9aa1ab; --hover: #e4e7eb;
+    --accent: #2f6fde; --accent-ink: #ffffff; --accent-soft: #dfe9fb;
+    --ok: #1e9e5a; --warn: #c98a12; --danger: #d0453c; --ext: #2f6fde;
+    --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+    --mono: "Cascadia Mono", Consolas, ui-monospace, monospace;
+    --pop: 0 12px 40px rgba(20, 24, 31, .18), 0 2px 6px rgba(20, 24, 31, .10);
+    --icon-shadow: 0 1px 2px rgba(20, 24, 31, .18), 0 4px 12px rgba(20, 24, 31, .10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121418; --surface: #1b1e23; --raised: #20242a; --line: #2a2e35; --line-strong: #3a3f48;
+      --ink: #e8eaee; --muted: #9aa1ab; --faint: #646b76; --hover: #262a31;
+      --accent: #6aa0ff; --accent-ink: #0d1626; --accent-soft: #1e2a3d;
+      --ok: #45c07f; --warn: #e0a83a; --danger: #ef6a60; --ext: #6aa0ff;
+      --pop: 0 12px 40px rgba(0, 0, 0, .55), 0 2px 6px rgba(0, 0, 0, .4);
+      --icon-shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 4px 12px rgba(0, 0, 0, .3);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--sans); }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.75;
+          stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+  .ico { border-radius: 22%; object-fit: cover; background: var(--raised); box-shadow: var(--icon-shadow); display: block; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); flex: none; }
+  .dot.running { background: var(--ok); }
+  .dot.starting { background: var(--warn); animation: pulse 1s infinite; }
+  .dot.external { background: var(--ext); }
+  .dot.exited { background: var(--danger); }
+  .dot.static, .dot.stopped { background: transparent; box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+  @keyframes pulse { 50% { opacity: .35; } }
+  @media (prefers-reduced-motion: reduce) { .dot.starting { animation: none; } }
+
+  .ibtn {
+    width: 32px; height: 32px; display: inline-grid; place-items: center; border-radius: 8px;
+    border: 0; background: transparent; color: var(--muted);
+  }
+  .ibtn:hover { background: var(--hover); color: var(--ink); }
+  .pbtn {
+    display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px 0 11px;
+    border-radius: 8px; border: 0; background: var(--accent); color: var(--accent-ink); font-weight: 600;
+  }
+  .pbtn:hover { filter: brightness(1.07); }
+  .pbtn.quiet { background: var(--raised); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); font-weight: 500; }
+  .pbtn.danger { background: transparent; color: var(--danger); box-shadow: none; font-weight: 500; padding: 0 10px; }
+  .pbtn.danger:hover { background: var(--hover); filter: none; }
+  .pbtn svg.i { width: 16px; height: 16px; }
+  .pbtn:disabled { opacity: .5; cursor: default; }
+
+  /* Shelf */
+  .shelf { max-width: 980px; margin: 0 auto; padding: 22px 28px 60px; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
+  header h1 { margin: 0; font: 600 20px var(--display); letter-spacing: -.01em; }
+  header .count { color: var(--muted); font-size: 13px; }
+  .search {
+    display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border-radius: 8px;
+    background: var(--surface); border: 1px solid var(--line); color: var(--faint); width: 220px; margin-left: auto;
+  }
+  .search:focus-within { border-color: var(--accent); }
+  .search input { border: 0; background: transparent; outline: none; width: 100%; color: var(--ink); }
+  .search svg.i { width: 16px; height: 16px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(116px, 1fr)); gap: 22px 8px; }
+  .tile {
+    position: relative; display: flex; flex-direction: column; align-items: center; gap: 9px;
+    padding: 12px 6px 10px; border-radius: 14px; text-align: center; cursor: pointer; user-select: none;
+  }
+  .tile:hover, .tile.active { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+  .tile .wrap { position: relative; }
+  .tile .ico { width: 68px; height: 68px; }
+  .tile.busy .ico { opacity: .6; }
+  .tile .badge { position: absolute; right: -3px; bottom: -3px; width: 16px; height: 16px; border-radius: 50%;
+                 background: var(--bg); display: grid; place-items: center; }
+  .tile .badge .dot { width: 10px; height: 10px; }
+  .tile .nm { font-size: 13px; line-height: 1.3; max-width: 100%; overflow: hidden; display: -webkit-box;
+              -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .tile .st { font-size: 11.5px; color: var(--muted); margin-top: -6px; min-height: 15px; }
+  .tile .st.exited { color: var(--danger); }
+  .tile .more { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; opacity: 0; }
+  .tile:hover .more, .tile.active .more, .tile:focus-within .more { opacity: 1; }
+  .tile .more svg.i { width: 16px; height: 16px; }
+  .empty { padding: 70px 20px; text-align: center; color: var(--muted); grid-column: 1 / -1; }
+  .empty .pbtn { margin-top: 14px; }
+
+  /* Popover with everything else about one project */
+  .popover {
+    position: absolute; z-index: 20; width: 360px; background: var(--surface); border-radius: 14px;
+    box-shadow: var(--pop); border: 1px solid var(--line); padding: 16px; display: none;
+  }
+  .popover.open { display: block; }
+  .popover.wide { width: 560px; }
+  .popover .head { display: flex; gap: 12px; align-items: center; }
+  .popover .head .ico { width: 44px; height: 44px; }
+  .popover .head .nm { font: 600 16px var(--display); }
+  .popover .head .sub { color: var(--muted); font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
+  .popover .desc { margin: 12px 0 0; color: var(--muted); }
+  .popover .acts { display: flex; gap: 2px; align-items: center; margin-top: 14px; padding-top: 12px;
+                   border-top: 1px solid var(--line); }
+  .popover .acts .pbtn { margin-right: auto; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 13px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 12.5px;
+  }
+  .chip:hover { color: var(--ink); border-color: var(--line-strong); }
+  .chip[aria-expanded="true"] { background: var(--accent-soft); border-color: transparent; color: var(--ink); }
+  .chip svg.i { width: 14px; height: 14px; }
+  .reveal { margin-top: 10px; font: 12px/1.5 var(--mono); color: var(--muted); background: var(--raised); border-radius: 8px;
+            padding: 8px 10px; word-break: break-all; display: flex; gap: 4px; align-items: flex-start; }
+  .reveal span { flex: 1; padding-top: 1px; }
+  .reveal .ibtn { width: 24px; height: 24px; margin: -2px -4px -2px 0; }
+  .reveal .ibtn svg.i { width: 14px; height: 14px; }
+  .log {
+    margin: 10px 0 0; padding: 10px 12px; height: 260px; overflow: auto; border-radius: 8px;
+    background: var(--raised); border: 1px solid var(--line); font: 12px/1.45 var(--mono);
+    white-space: pre-wrap; word-break: break-all; color: var(--muted);
+  }
+
+  .form { display: grid; grid-template-columns: 76px 1fr; gap: 8px 12px; align-items: center; margin-top: 14px; }
+  .form label { color: var(--muted); font-size: 13px; }
+  .form input {
+    width: 100%; height: 32px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 8px;
+    background: var(--bg); font-size: 13px;
+  }
+  .form input.code { font-family: var(--mono); font-size: 12px; }
+  .form input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .form .rowin { display: flex; gap: 6px; }
+  .form .hint { grid-column: 2; color: var(--muted); font-size: 12px; min-height: 17px; margin-top: -2px; }
+  .formacts { display: flex; gap: 8px; align-items: center; margin-top: 14px; }
+  .formacts .grow { flex: 1; }
+
+  dialog {
+    border: 1px solid var(--line); border-radius: 14px; padding: 20px; width: min(520px, calc(100vw - 32px));
+    background: var(--surface); color: var(--ink); box-shadow: var(--pop);
+  }
+  dialog::backdrop { background: rgba(10, 12, 16, .35); }
+  dialog h2 { margin: 0; font: 600 17px var(--display); }
+
+  .toast {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 50;
+    background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px;
+    box-shadow: var(--pop); font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 640px) {
+    .shelf { padding: 18px 16px 40px; }
+    .search { width: auto; flex: 1; min-width: 0; }
+    header .count { display: none; }
+    .popover, .popover.wide { width: calc(100vw - 32px); }
+  }
+</style>
+</head>
+<body>
+<div class="shelf">
+  <header>
+    <h1>Launchpad</h1><span class="count" id="count"></span>
+    <label class="search"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 4.5 4.5"/></svg>
+      <input id="filter" placeholder="Find a project" spellcheck="false" aria-label="Find a project"></label>
+    <button class="ibtn" id="addOpen" title="Add project" aria-label="Add project"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+  </header>
+  <div class="grid" id="grid"></div>
+</div>
+<div class="popover" id="pop" role="dialog" aria-modal="false"></div>
+
+<dialog id="add" aria-labelledby="addTitle">
+  <h2 id="addTitle">Add project</h2>
+  <div class="form">
+    <label for="aPath">Folder</label>
+    <div class="rowin"><input id="aPath" class="code" placeholder="C:\code\my-project" spellcheck="false">
+      <button class="pbtn quiet" id="detect">Detect</button></div>
+    <span></span><span class="hint" id="aHint">Paste a folder and press Detect to fill in how it runs.</span>
+    <label for="aName">Name</label><input id="aName" spellcheck="false">
+    <label for="aCmd">Command</label><input id="aCmd" class="code" placeholder="empty for static pages and plain folders" spellcheck="false">
+    <label for="aUrl">Address</label><input id="aUrl" class="code" placeholder="empty for desktop apps and plain folders" spellcheck="false">
+  </div>
+  <div class="formacts"><span class="grow"></span>
+    <button class="pbtn quiet" id="addCancel">Cancel</button>
+    <button class="pbtn" id="addSave">Add project</button></div>
+</dialog>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+const PATHS = {
+  play: '<path d="M7 5.5v13l11-6.5z"/>',
+  stop: '<rect x="6.5" y="6.5" width="11" height="11" rx="2"/>',
+  restart: '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/>',
+  open: '<path d="M14 4.5h5.5V10"/><path d="M19.5 4.5 11 13"/><path d="M18 14v4.5a1 1 0 0 1-1 1H5.5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1H10"/>',
+  folder: '<path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2 2h7.4a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
+  chatNew: '<path d="M4.5 5.5h15v10.5H10l-5.5 4z"/><path d="M12 8.2v5M9.5 10.7h5"/>',
+  chat: '<path d="M4.5 5.5h15v10.5H10l-5.5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>',
+  log: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="m7.5 9.5 3 2.5-3 2.5M13 14.5h4"/>',
+  more: '<circle cx="5.5" cy="12" r="1.1"/><circle cx="12" cy="12" r="1.1"/><circle cx="18.5" cy="12" r="1.1"/>',
+  copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/>',
+  edit: '<path d="M14.5 5.5 18.5 9.5 9 19H5v-4z"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/>',
+  terminal: '<path d="m5 8 4 4-4 4M11 16h8"/>',
+};
+const I = (name) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${PATHS[name]}</svg>`;
+
+const STATE = { running: "Running", starting: "Starting…", external: "Running elsewhere", exited: "Stopped unexpectedly", stopped: "Stopped", static: "" };
+const kind = (p) => p.command ? (p.url ? "Web app" : "Desktop app") : (p.url ? "Static page" : "Folder");
+const isOn = (p) => ["running", "starting", "external"].includes(p.status.state);
+const ours = (p) => ["running", "starting"].includes(p.status.state);  // started by Launchpad, so it can stop it
+
+let projects = [], filter = "";
+let pop = null;  // {id, chip, log, edit}: the open popover
+const logText = new Map();  // last fetched log per project, so re-renders don't flash empty
+
+async function api(method, path, body) {
+  // The timeout keeps one stalled reply from holding up every refresh after it
+  const res = await fetch(path, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(10000) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+const route = (p, act = "") => `/api/projects/${encodeURIComponent(p.id)}${act ? "/" + act : ""}`;
+
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+function ago(seconds) {
+  const s = Date.now() / 1000 - seconds;
+  for (const [unit, n] of [["year", 31536000], ["month", 2592000], ["week", 604800], ["day", 86400], ["hour", 3600], ["minute", 60]]) {
+    if (s >= n) { const k = Math.floor(s / n); return `${k} ${unit}${k > 1 ? "s" : ""} ago`; }
+  }
+  return "just now";
+}
+
+// What clicking the icon does; null means it opens the popover instead (a running desktop app,
+// where the only thing left to do is stop it, and that shouldn't be one stray click away)
+function primary(p) {
+  if (p.url) return { act: "open", label: "Open", icon: "open" };
+  if (p.command && !isOn(p)) return { act: "start", label: "Start", icon: "play" };
+  if (p.command) return { act: "stop", label: "Stop", icon: "stop", popover: true };
+  return { act: "folder", label: "Open folder", icon: "folder" };
+}
+function secondary(p) {
+  const b = [];
+  if (p.command && p.url && ours(p)) b.push(["stop", "Stop", "stop"]);
+  if (p.command && ours(p)) b.push(["restart", "Restart", "restart"]);
+  if (primary(p).act !== "folder") b.push(["folder", "Open folder", "folder"]);
+  b.push(["new-chat", "New Claude chat in this folder", "chatNew"]);
+  if (p.chat) b.push(["last-chat", `Resume “${p.chat.title || "last chat"}” in Claude`, "chat"]);
+  b.push(["edit", "Edit", "edit"]);
+  return b;
+}
+// Details that are a click away, as [label, value, icon, action for the value]
+function facts(p) {
+  const f = [["Folder", p.path, "folder", "folder"]];
+  if (p.command) f.push(["Command", p.command, "terminal", null]);
+  if (p.url) f.push(["Address", p.url, "link", "open"]);
+  if (p.chat) f.push(["Last chat", `${p.chat.title || "Untitled"} (${ago(p.chat.updated)})`, "chat", "last-chat"]);
+  return f;
+}
+const ACT_TITLE = { folder: "Open folder", open: "Open", "last-chat": "Resume in Claude" };
+const ACT_ICON = { folder: "folder", open: "open", "last-chat": "chat" };
+
+/* ------------------------------------------------------------------ rendering */
+let gridKey = "", popKey = "";
+
+function renderGrid() {
+  const running = projects.filter(isOn).length;
+  $("count").textContent = running ? `${running} running` : "";
+  const shown = projects.filter((p) => !filter || `${p.name} ${p.description} ${p.path}`.toLowerCase().includes(filter));
+  // Only rebuild when something visible changed, so hover, focus and images stay put between polls
+  const key = JSON.stringify([shown.map((p) => [p.id, p.name, p.icon, p.status.state, primary(p).label]), pop?.id, filter, projects.length]);
+  if (key === gridKey) return;
+  gridKey = key;
+  const focused = document.activeElement?.closest?.(".tile")?.dataset.id;
+  if (!projects.length) {
+    $("grid").innerHTML = `<div class="empty">No projects yet.<br><button class="pbtn" data-act="add">Add project</button></div>`;
+    return;
+  }
+  $("grid").innerHTML = shown.map((p) => {
+    const s = p.status.state, a = primary(p);
+    const label = a.popover ? `${p.name}, running` : `${a.label} ${p.name}`;
+    return `<div class="tile${pop?.id === p.id ? " active" : ""}" data-id="${esc(p.id)}" role="button" tabindex="0" title="${esc(label)}" aria-label="${esc(label)}">
+      <div class="wrap"><img class="ico" src="${esc(p.icon)}" alt="">
+        ${s === "static" || s === "stopped" ? "" : `<span class="badge"><span class="dot ${s}"></span></span>`}</div>
+      <div class="nm">${esc(p.name)}</div>
+      <div class="st ${s}">${isOn(p) || s === "exited" ? esc(STATE[s]) : ""}</div>
+      <button class="ibtn more" data-act="pop" title="More" aria-label="More for ${esc(p.name)}">${I("more")}</button>
+    </div>`;
+  }).join("") || `<div class="empty">Nothing matches “${esc(filter)}”.</div>`;
+  if (focused) $("grid").querySelector(`.tile[data-id="${CSS.escape(focused)}"]`)?.focus();
+}
+
+function renderPop() {
+  const el = $("pop");
+  const p = pop && projects.find((x) => x.id === pop.id);
+  if (!p) { pop = null; popKey = ""; el.classList.remove("open"); delete el.dataset.mode; return; }
+  // Polls only redraw when the project changed, and never under an edit you're typing
+  const mode = pop.edit ? "edit" : "view";
+  const key = JSON.stringify([p, pop]);
+  if (key === popKey || (mode === "edit" && el.dataset.mode === "edit" && el.dataset.id === p.id)) return placePop();
+  popKey = key;
+  el.dataset.mode = mode;
+  const s = p.status.state, a = primary(p), fs = facts(p);
+  const chip = fs.find((f) => f[0] === pop.chip);
+  el.dataset.id = p.id;
+  el.classList.toggle("wide", !!pop.log && !pop.edit);
+  const head = `<div class="head"><img class="ico" src="${esc(p.icon)}" alt=""><div>
+      <div class="nm">${esc(p.name)}</div>
+      <div class="sub">${s !== "static" ? `<span class="dot ${s}"></span>${esc(STATE[s])}${s === "exited" && p.status.exit != null ? ` (exit code ${p.status.exit})` : ""}` : esc(kind(p))}</div></div></div>`;
+  if (pop.edit) {
+    el.innerHTML = `${head}
+      <div class="form">
+        <label>Name</label><input data-f="name" value="${esc(p.name)}" spellcheck="false">
+        <label>Folder</label><input data-f="path" class="code" value="${esc(p.path)}" spellcheck="false">
+        <label>Command</label><input data-f="command" class="code" value="${esc(p.command)}" placeholder="empty for static pages and folders" spellcheck="false">
+        <label>Address</label><input data-f="url" class="code" value="${esc(p.url)}" placeholder="empty for desktop apps" spellcheck="false">
+      </div>
+      <p class="desc" style="font-size:12.5px">Icon and description come from <code>.launchpad.json</code> in the project folder.</p>
+      <div class="formacts">
+        <button class="pbtn danger" data-act="remove">Remove</button><span class="grow"></span>
+        <button class="pbtn quiet" data-act="edit">Cancel</button>
+        <button class="pbtn" data-act="save">Save</button></div>`;
+    el.classList.add("open");
+    placePop();
+    el.querySelector("input").focus();
+    return;
+  }
+  const logEl = el.querySelector(".log");
+  const scroll = logEl && el.dataset.id === p.id ? logEl.scrollTop : null;
+  el.innerHTML = `${head}
+    ${p.description ? `<p class="desc">${esc(p.description)}</p>` : ""}
+    <div class="chips">
+      ${fs.map(([k, , icon]) => `<button class="chip" data-chip="${k}" aria-expanded="${pop.chip === k}">${I(icon)}${k}</button>`).join("")}
+      ${p.command ? `<button class="chip" data-chip="Log" aria-expanded="${!!pop.log}">${I("log")}Log</button>` : ""}
+    </div>
+    ${chip ? `<div class="reveal"><span>${esc(chip[1])}</span>
+      <button class="ibtn" data-act="copy" data-copy="${esc(chip[1])}" title="Copy" aria-label="Copy">${I("copy")}</button>
+      ${chip[3] ? `<button class="ibtn" data-act="${chip[3]}" title="${ACT_TITLE[chip[3]]}" aria-label="${ACT_TITLE[chip[3]]}">${I(ACT_ICON[chip[3]])}</button>` : ""}</div>` : ""}
+    ${pop.log && p.command ? `<pre class="log" id="log">${esc(logText.get(p.id) ?? "loading…")}</pre>` : ""}
+    <div class="acts"><button class="pbtn${a.act === "stop" ? " quiet" : ""}" data-act="${a.act}">${I(a.icon)}${a.label}</button>
+      ${secondary(p).map(([act, title, icon]) => `<button class="ibtn" data-act="${act}" title="${esc(title)}" aria-label="${esc(title)}">${I(icon)}</button>`).join("")}</div>`;
+  el.classList.add("open");
+  const log = $("log");
+  if (log) log.scrollTop = scroll ?? log.scrollHeight;
+  placePop();
+}
+
+// Under the tile, or above it when there's no room below; never off the sides
+function placePop() {
+  const el = $("pop");
+  const tile = pop && $("grid").querySelector(`.tile[data-id="${CSS.escape(pop.id)}"]`);
+  if (!tile) { el.classList.remove("open"); return; }
+  const r = tile.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
+  const left = Math.max(16, Math.min(r.left + r.width / 2 - w / 2, document.documentElement.clientWidth - w - 16));
+  const below = r.bottom + 6, fitsBelow = below + h < innerHeight - 8 || r.top - h - 6 < 8;
+  el.style.left = left + scrollX + "px";
+  el.style.top = (fitsBelow ? below : r.top - h - 6) + scrollY + "px";
+}
+
+async function refreshLog() {
+  if (!pop?.log || pop.edit) return;
+  const p = projects.find((x) => x.id === pop.id); if (!p) return;
+  try {
+    const { log } = await api("GET", `${route(p, "log")}?lines=300`);
+    const text = log || "(no output yet)";
+    const el = $("log");
+    logText.set(p.id, text);
+    if (!el || el.textContent === text) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30;
+    el.textContent = text;
+    if (atBottom) el.scrollTop = el.scrollHeight;  // follow new output unless you've scrolled up
+  } catch { /* next poll */ }
+}
+
+async function refresh() {
+  try { projects = await api("GET", "/api/projects"); } catch { return; /* server restarting */ }
+  renderGrid(); renderPop(); refreshLog();
+}
+
+function openPop(id, extra = {}) {
+  pop = { id, chip: null, log: false, edit: false, ...extra };
+  gridKey = popKey = "";
+  delete $("pop").dataset.mode;
+  renderGrid(); renderPop(); refreshLog();
+}
+function closePop() {
+  if (!pop) return;
+  const id = pop.id;
+  pop = null; gridKey = "";
+  renderGrid(); renderPop();
+  $("grid").querySelector(`.tile[data-id="${CSS.escape(id)}"]`)?.focus({ preventScroll: true });
+}
+
+/* ------------------------------------------------------------------ actions */
+async function run(act, p) {
+  try {
+    if (act === "open") {
+      await api("POST", route(p, "open"));
+      toast(p.command && !isOn(p) ? `Starting ${p.name}; it opens when it's ready` : `Opening ${p.name}`);
+    } else if (act === "save") {
+      const changes = {}; $("pop").querySelectorAll("[data-f]").forEach((i) => { changes[i.dataset.f] = i.value; });
+      await api("PUT", route(p), changes); pop.edit = false; toast("Saved");
+    } else if (act === "remove") {
+      if (!confirm(`Remove ${p.name} from Launchpad? (This doesn't touch its files.)`)) return;
+      await api("DELETE", route(p)); pop = null; toast(`Removed ${p.name}`);
+    } else {
+      await api("POST", route(p, act));
+      if (act === "start") toast(`Starting ${p.name}`);
+      if (act === "stop") toast(`Stopped ${p.name}`);
+      if (act === "restart") toast(`Restarted ${p.name}`);
+      if (act === "new-chat") toast("Opening a new chat in Claude; confirm the folder there");
+      if (act === "last-chat") toast(`Opening “${p.chat?.title || "last chat"}” in Claude`);
+    }
+  } catch (err) { toast(err.message); }
+  refresh();
+}
+
+$("grid").addEventListener("click", (e) => {
+  if (e.target.closest("[data-act='add']")) return openAdd();
+  const tile = e.target.closest(".tile"); if (!tile) return;
+  const p = projects.find((x) => x.id === tile.dataset.id); if (!p) return;
+  if (e.target.closest("[data-act='pop']")) { e.stopPropagation(); return pop?.id === p.id ? closePop() : openPop(p.id); }
+  const a = primary(p);
+  if (a.popover) return openPop(p.id);
+  if (pop) closePop();
+  run(a.act, p);
+});
+$("grid").addEventListener("contextmenu", (e) => {
+  const tile = e.target.closest(".tile"); if (!tile) return;
+  e.preventDefault(); openPop(tile.dataset.id);
+});
+$("grid").addEventListener("keydown", (e) => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches(".tile")) { e.preventDefault(); e.target.click(); }
+});
+
+$("pop").addEventListener("click", async (e) => {
+  const p = projects.find((x) => x.id === pop?.id); if (!p) return;
+  const chip = e.target.closest("[data-chip]");
+  if (chip) {
+    if (chip.dataset.chip === "Log") pop.log = !pop.log; else pop.chip = pop.chip === chip.dataset.chip ? null : chip.dataset.chip;
+    renderPop(); refreshLog(); return;
+  }
+  const t = e.target.closest("[data-act]"); if (!t) return;
+  const act = t.dataset.act;
+  if (act === "copy") {
+    try { await navigator.clipboard.writeText(t.dataset.copy); toast("Copied"); } catch { toast("Couldn't copy"); }
+    return;
+  }
+  if (act === "edit") { pop.edit = !pop.edit; renderPop(); return; }
+  run(act, p);
+});
+$("pop").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && e.target.matches("[data-f]")) run("save", projects.find((x) => x.id === pop.id));
+});
+document.addEventListener("click", (e) => {
+  // composedPath, not e.target.closest: a click inside the popover may have redrawn it by now,
+  // leaving e.target detached
+  const inside = e.composedPath().some((n) => n.id === "pop" || n.tagName === "DIALOG" || n.classList?.contains("tile"));
+  if (pop && !inside) closePop();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && pop && !$("add").open) closePop();
+  if (e.key === "/" && document.activeElement === document.body) { e.preventDefault(); $("filter").focus(); }
+});
+window.addEventListener("resize", placePop);
+
+$("filter").addEventListener("input", (e) => { filter = e.target.value.trim().toLowerCase(); renderGrid(); placePop(); });
+$("filter").addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { e.target.value = ""; filter = ""; renderGrid(); }
+  if (e.key === "Enter") $("grid").querySelector(".tile")?.click();  // type a name, press Enter to launch it
+});
+
+/* ------------------------------------------------------------------ add project */
+function openAdd() { closePop(); $("add").showModal(); $("aPath").focus(); }
+$("addOpen").addEventListener("click", openAdd);
+$("addCancel").addEventListener("click", () => $("add").close());
+$("detect").addEventListener("click", async () => {
+  try {
+    const found = await api("POST", "/api/detect", { path: $("aPath").value });
+    if (!found.length) { $("aHint").textContent = "Couldn't tell how this runs. Enter a command, or leave it empty to just keep the folder here."; return; }
+    const f = found[0];
+    $("aName").value = f.name; $("aCmd").value = f.command; $("aUrl").value = f.url;
+    $("aHint").textContent = `From ${f.source}` + (found.length > 1 ? ` (also found: ${found.slice(1).map((x) => x.source).join(", ")})` : "");
+  } catch (err) { $("aHint").textContent = err.message; }
+});
+$("aPath").addEventListener("keydown", (e) => { if (e.key === "Enter") $("detect").click(); });
+$("addSave").addEventListener("click", async () => {
+  try {
+    const p = await api("POST", "/api/projects", { path: $("aPath").value, name: $("aName").value, command: $("aCmd").value, url: $("aUrl").value });
+    ["aPath", "aName", "aCmd", "aUrl"].forEach((i) => { $(i).value = ""; });
+    $("aHint").textContent = "Paste a folder and press Detect to fill in how it runs.";
+    $("add").close(); toast(`Added ${p.name}`); refresh();
+  } catch (err) { $("aHint").textContent = err.message; }
+});
+
+// Refresh every 2 s, each one starting only after the last finished (so slow replies can't pile
+// up), and do nothing while the window is minimized or covered: catch up as soon as it shows.
+let pollTimer;
+async function poll() {
+  clearTimeout(pollTimer);
+  if (!document.hidden) await refresh();
+  pollTimer = setTimeout(poll, 2000);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
+poll();
+</script>
+</body>
+</html>

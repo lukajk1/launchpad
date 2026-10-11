@@ -1,0 +1,32 @@
+{
+  "projects": [
+    {
+      "id": "my-web-app",
+      "name": "My web app",
+      "path": "C:\code\my-web-app",
+      "command": "npm run dev",
+      "url": "http://127.0.0.1:3000"
+    },
+    {
+      "id": "my-desktop-app",
+      "name": "My desktop app",
+      "path": "C:\code\my-desktop-app",
+      "command": "pythonw main.pyw",
+      "url": ""
+    },
+    {
+      "id": "my-static-page",
+      "name": "My static page",
+      "path": "C:\code\my-static-page",
+      "command": "",
+      "url": "file:///C:/code/my-static-page/index.html"
+    },
+    {
+      "id": "notes",
+      "name": "Notes",
+      "path": "C:\code\notes",
+      "command": "",
+      "url": ""
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "launchpad-dev",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-c", "import launchpad as l; from http.server import ThreadingHTTPServer as S; S(('127.0.0.1', 4701), l.Handler).serve_forever()"],
+      "port": 4701
+    }
+  ]
+}
